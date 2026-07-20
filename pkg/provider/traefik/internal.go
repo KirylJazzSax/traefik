@@ -105,18 +105,23 @@ func (i *Provider) acme(cfg *dynamic.Configuration) {
 	var epsByPass []string
 	uniq := map[string]struct{}{}
 	for _, resolver := range i.staticCfg.CertificatesResolvers {
-		if resolver.ACME != nil && resolver.ACME.HTTPChallenge != nil && resolver.ACME.HTTPChallenge.EntryPoint != "" {
-			if _, ok := uniq[resolver.ACME.HTTPChallenge.EntryPoint]; ok {
-				continue
-			}
-			uniq[resolver.ACME.HTTPChallenge.EntryPoint] = struct{}{}
+		if resolver.ACME != nil && resolver.ACME.HTTPChallenge != nil {
+			for _, ep := range resolver.ACME.HTTPChallenge.GetEntryPoints() {
+				if ep == "" {
+					continue
+				}
+				if _, ok := uniq[ep]; ok {
+					continue
+				}
+				uniq[ep] = struct{}{}
 
-			if allowByPass, ok := allowACMEByPass[resolver.ACME.HTTPChallenge.EntryPoint]; ok && allowByPass {
-				epsByPass = append(epsByPass, resolver.ACME.HTTPChallenge.EntryPoint)
-				continue
-			}
+				if allowByPass, ok := allowACMEByPass[ep]; ok && allowByPass {
+					epsByPass = append(epsByPass, ep)
+					continue
+				}
 
-			eps = append(eps, resolver.ACME.HTTPChallenge.EntryPoint)
+				eps = append(eps, ep)
+			}
 		}
 	}
 

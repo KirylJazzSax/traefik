@@ -307,6 +307,68 @@ func Test_createConfiguration(t *testing.T) {
 					"default": {
 						ACME: &acmeprovider.Configuration{
 							HTTPChallenge: &acmeprovider.HTTPChallenge{
+								EntryPoints: []string{"web"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "redirection_without_acme_bypass.json",
+			staticCfg: static.Configuration{
+				EntryPoints: map[string]*static.EntryPoint{
+					"web": {
+						Address: ":80",
+						HTTP: static.HTTPConfig{
+							Redirections: &static.Redirections{
+								EntryPoint: &static.RedirectEntryPoint{
+									To:        "websecure",
+									Scheme:    "https",
+									Permanent: true,
+								},
+							},
+						},
+					},
+					"websecure": {
+						Address: ":443",
+					},
+				},
+				CertificatesResolvers: map[string]static.CertificateResolver{
+					"default": {
+						ACME: &acmeprovider.Configuration{
+							HTTPChallenge: &acmeprovider.HTTPChallenge{
+								EntryPoint: "web",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "redirection_without_acme_bypass.json",
+			staticCfg: static.Configuration{
+				EntryPoints: map[string]*static.EntryPoint{
+					"web": {
+						Address: ":80",
+						HTTP: static.HTTPConfig{
+							Redirections: &static.Redirections{
+								EntryPoint: &static.RedirectEntryPoint{
+									To:        "websecure",
+									Scheme:    "https",
+									Permanent: true,
+								},
+							},
+						},
+					},
+					"websecure": {
+						Address: ":443",
+					},
+				},
+				CertificatesResolvers: map[string]static.CertificateResolver{
+					"default": {
+						ACME: &acmeprovider.Configuration{
+							HTTPChallenge: &acmeprovider.HTTPChallenge{
 								EntryPoint: "web",
 							},
 						},

@@ -22,7 +22,7 @@
 
   {{if $resolvers.ACME.HTTPChallenge }}
   [certificatesResolvers.{{ $name }}.acme.httpChallenge]
-    entryPoint = "{{ $resolvers.ACME.HTTPChallenge.EntryPoint }}"
+    entryPoints = [{{range $i, $ep := $resolvers.ACME.HTTPChallenge.EntryPoints}}{{if $i}}, {{end}}"{{ $ep }}"{{end}}]
   {{end}}
 
   {{if $resolvers.ACME.TLSChallenge }}

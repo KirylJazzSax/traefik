@@ -22,7 +22,8 @@ certificatesResolvers:
       storage: acme.json
       httpChallenge:
         # used during the challenge
-        entryPoint: web
+        entryPoints:
+          - web
 ```
 
 ```toml tab="File (TOML)"
@@ -38,7 +39,7 @@ certificatesResolvers:
   storage = "acme.json"
   [certificatesResolvers.myresolver.acme.httpChallenge]
     # used during the challenge
-    entryPoint = "web"
+    entryPoints = ["web"]
 ```
 
 ```bash tab="CLI"
@@ -48,7 +49,7 @@ certificatesResolvers:
 --certificatesresolvers.myresolver.acme.email=your-email@example.com
 --certificatesresolvers.myresolver.acme.storage=acme.json
 # used during the challenge
---certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web
+--certificatesresolvers.myresolver.acme.httpchallenge.entrypoints=web
 ```
 
 ```yaml tab="Helm Chart Values"
@@ -65,8 +66,9 @@ certificatesResolvers:
       email: "your-email@example.com"
       storage: "/data/acme.json"       # Path to store the certificate information.
       httpChallenge:
-        # Entry point to use during the ACME HTTP-01 challenge.
-        entryPoint: "web"
+        # Entry points to use during the ACME HTTP-01 challenge.
+        entryPoints:
+          - "web"
 ```
 
 ## Configuration Options
@@ -100,7 +102,7 @@ ACME certificate resolvers have the following configuration options:
 | <a id="opt-acme-dnsChallenge-propagation-requireAllRNS" href="#opt-acme-dnsChallenge-propagation-requireAllRNS" title="#opt-acme-dnsChallenge-propagation-requireAllRNS">`acme.dnsChallenge.propagation.requireAllRNS`</a> | Enables the challenge TXT record to be propagated to all recursive nameservers. If you have disabled authoritative nameservers checks (with `propagation.disableANSChecks`), it is recommended to check all recursive nameservers instead. | false | No |
 | <a id="opt-acme-dnsChallenge-propagation-disableANSChecks" href="#opt-acme-dnsChallenge-propagation-disableANSChecks" title="#opt-acme-dnsChallenge-propagation-disableANSChecks">`acme.dnsChallenge.propagation.disableANSChecks`</a> | Disables the challenge TXT record propagation checks against authoritative nameservers. This option will skip the propagation check against the nameservers of the authority (SOA). It should be used only if the nameservers of the authority are not reachable. | false | No |
 | <a id="opt-acme-httpChallenge" href="#opt-acme-httpChallenge" title="#opt-acme-httpChallenge">`acme.httpChallenge`</a> | Enable HTTP-01 challenge. More information [here](#httpchallenge). | | No |
-| <a id="opt-acme-httpChallenge-entryPoint" href="#opt-acme-httpChallenge-entryPoint" title="#opt-acme-httpChallenge-entryPoint">`acme.httpChallenge.entryPoint`</a> | EntryPoint to use for the HTTP-01 challenges. Must be reachable by Let's Encrypt through port 80 | "" | Yes |
+| <a id="opt-acme-httpChallenge-entryPoints" href="#opt-acme-httpChallenge-entryPoints" title="#opt-acme-httpChallenge-entryPoints">`acme.httpChallenge.entryPoints`</a> | Entry points to use for the HTTP-01 challenges. Must be reachable by Let's Encrypt through port 80. Multiple entry points can be specified (e.g., for dual-stack IPv4/IPv6 setups). | [] | Yes |
 | <a id="opt-acme-httpChallenge-delay" href="#opt-acme-httpChallenge-delay" title="#opt-acme-httpChallenge-delay">`acme.httpChallenge.delay`</a> | The delay between the creation of the challenge and the validation. A value lower than or equal to zero means no delay. | 0 | No |
 | <a id="opt-acme-tlsChallenge" href="#opt-acme-tlsChallenge" title="#opt-acme-tlsChallenge">`acme.tlsChallenge`</a> | Enable TLS-ALPN-01 challenge. Traefik must be reachable by Let's Encrypt through port 443. More information [here](#tlschallenge). | - | No |
 | <a id="opt-acme-tlschallenge-delay" href="#opt-acme-tlschallenge-delay" title="#opt-acme-tlschallenge-delay">`acme.tlschallenge.delay`</a> | The delay between the creation of the challenge and the validation. A value lower than or equal to zero means no delay.                                                                                                                                                 | 0                                              | No       |
@@ -180,7 +182,7 @@ when using the `TLS-ALPN-01` challenge, Traefik must be reachable by Let's Encry
 Use the `HTTP-01` challenge to generate and renew ACME certificates by provisioning an HTTP resource under a well-known URI.
 
 As described on the Let's Encrypt [community forum](https://community.letsencrypt.org/t/support-for-ports-other-than-80-and-443/3419/72),
-when using the `HTTP-01` challenge, `certificatesresolvers.myresolver.acme.httpchallenge.entrypoint` must be reachable by Let's Encrypt through port 80.
+when using the `HTTP-01` challenge, `certificatesresolvers.myresolver.acme.httpchallenge.entrypoints` must be reachable by Let's Encrypt through port 80.
 
 ??? example "Using an EntryPoint Called web for the `httpChallenge`"
 
@@ -197,7 +199,8 @@ when using the `HTTP-01` challenge, `certificatesresolvers.myresolver.acme.httpc
         acme:
           # ...
           httpChallenge:
-            entryPoint: web
+            entryPoints:
+              - web
     ```
 
     ```toml tab="File (TOML)"
@@ -211,18 +214,65 @@ when using the `HTTP-01` challenge, `certificatesresolvers.myresolver.acme.httpc
     [certificatesResolvers.myresolver.acme]
       # ...
       [certificatesResolvers.myresolver.acme.httpChallenge]
-        entryPoint = "web"
+        entryPoints = ["web"]
     ```
 
     ```bash tab="CLI"
     --entryPoints.web.address=:80
     --entryPoints.websecure.address=:443
     # ...
-    --certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web
+    --certificatesresolvers.myresolver.acme.httpchallenge.entrypoints=web
     ```
 
-!!! info ""
-    Redirection is fully compatible with the `HTTP-01` challenge.
+??? example "Using multiple EntryPoints for the `httpChallenge` (dual-stack)"
+
+    This is useful when you have separate IPv4 and IPv6 entry points and want the HTTP-01 challenge to be served on both.
+
+    ```yaml tab="File (YAML)"
+    entryPoints:
+      web-v4:
+        address: ":80"
+
+      web-v6:
+        address: "[::]:80"
+
+      websecure:
+        address: ":443"
+
+    certificatesResolvers:
+      myresolver:
+        acme:
+          # ...
+          httpChallenge:
+            entryPoints:
+              - web-v4
+              - web-v6
+    ```
+
+    ```toml tab="File (TOML)"
+    [entryPoints]
+      [entryPoints.web-v4]
+        address = ":80"
+
+      [entryPoints.web-v6]
+        address = "[::]:80"
+
+      [entryPoints.websecure]
+        address = ":443"
+
+    [certificatesResolvers.myresolver.acme]
+      # ...
+      [certificatesResolvers.myresolver.acme.httpChallenge]
+        entryPoints = ["web-v4", "web-v6"]
+    ```
+
+    ```bash tab="CLI"
+    --entryPoints.web-v4.address=:80
+    --entryPoints.web-v6.address=[::]:80
+    --entryPoints.websecure.address=:443
+    # ...
+    --certificatesresolvers.myresolver.acme.httpchallenge.entrypoints=web-v4,web-v6
+    ```
 
 ## Domain Definition
 

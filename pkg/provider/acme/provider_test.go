@@ -643,3 +643,41 @@ func Test_getCertificateRenewDurations(t *testing.T) {
 		})
 	}
 }
+
+func TestHTTPChallenge_GetEntryPoints(t *testing.T) {
+	testCases := []struct {
+		desc      string
+		challenge HTTPChallenge
+		expected  []string
+	}{
+		{
+			desc:      "empty",
+			challenge: HTTPChallenge{},
+			expected:  nil,
+		},
+		{
+			desc:      "only deprecated EntryPoint",
+			challenge: HTTPChallenge{EntryPoint: "web"},
+			expected:  []string{"web"},
+		},
+		{
+			desc:      "only new EntryPoints",
+			challenge: HTTPChallenge{EntryPoints: []string{"web-v4", "web-v6"}},
+			expected:  []string{"web-v4", "web-v6"},
+		},
+		{
+			desc:      "both set, EntryPoints wins",
+			challenge: HTTPChallenge{EntryPoint: "old", EntryPoints: []string{"new-v4", "new-v6"}},
+			expected:  []string{"new-v4", "new-v6"},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			result := test.challenge.GetEntryPoints()
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}

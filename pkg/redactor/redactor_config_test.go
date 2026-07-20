@@ -948,6 +948,502 @@ func TestDo_staticConfiguration(t *testing.T) {
 					DisablePropagationCheck: true,
 				},
 				HTTPChallenge: &acme.HTTPChallenge{
+					EntryPoints: []string{"MyEntryPoint"},
+				},
+				TLSChallenge: &acme.TLSChallenge{},
+			},
+		},
+	}
+
+	config.Experimental = &static.Experimental{
+		Plugins: map[string]plugins.Descriptor{
+			"Descriptor0": {
+				ModuleName: "foobar",
+				Version:    "foobar",
+				Settings: plugins.Settings{
+					Envs:   []string{"a", "b"},
+					Mounts: []string{"a", "b"},
+				},
+			},
+			"Descriptor1": {
+				ModuleName: "foobar",
+				Version:    "foobar",
+				Settings: plugins.Settings{
+					Envs:   []string{"a", "b"},
+					Mounts: []string{"a", "b"},
+				},
+			},
+		},
+		LocalPlugins: map[string]plugins.LocalDescriptor{
+			"Descriptor0": {
+				ModuleName: "foobar",
+				Settings: plugins.Settings{
+					Envs:   []string{"a", "b"},
+					Mounts: []string{"a", "b"},
+				},
+			},
+			"Descriptor1": {
+				ModuleName: "foobar",
+				Settings: plugins.Settings{
+					Envs:   []string{"a", "b"},
+					Mounts: []string{"a", "b"},
+				},
+			},
+		},
+	}
+
+	expectedConfiguration, err := os.ReadFile("./testdata/anonymized-static-config.json")
+	require.NoError(t, err)
+
+	cleanJSON, err := anonymize(config, true)
+	require.NoError(t, err)
+
+	if *updateExpected {
+		require.NoError(t, os.WriteFile("testdata/anonymized-static-config.json", []byte(cleanJSON), 0o666))
+	}
+
+	expected := strings.TrimSuffix(string(expectedConfiguration), "\n")
+	assert.JSONEq(t, expected, cleanJSON)
+}
+
+func TestDo_staticConfigurationWithDeprecatedEntryPoint(t *testing.T) {
+	config := &static.Configuration{}
+
+	config.Global = &static.Global{
+		CheckNewVersion:    true,
+		SendAnonymousUsage: true,
+	}
+
+	config.ServersTransport = &static.ServersTransport{
+		InsecureSkipVerify:  true,
+		RootCAs:             []types.FileOrContent{"root.ca"},
+		MaxIdleConnsPerHost: 42,
+		ForwardingTimeouts: &static.ForwardingTimeouts{
+			DialTimeout:           42,
+			ResponseHeaderTimeout: 42,
+			IdleConnTimeout:       42,
+		},
+	}
+
+	config.EntryPoints = static.EntryPoints{
+		"foobar": &static.EntryPoint{
+			Address: "foo Address",
+			Transport: &static.EntryPointsTransport{
+				LifeCycle: &static.LifeCycle{
+					RequestAcceptGraceTimeout: ptypes.Duration(111 * time.Second),
+					GraceTimeOut:              ptypes.Duration(111 * time.Second),
+				},
+				RespondingTimeouts: &static.RespondingTimeouts{
+					ReadTimeout:  ptypes.Duration(111 * time.Second),
+					WriteTimeout: ptypes.Duration(111 * time.Second),
+					IdleTimeout:  ptypes.Duration(111 * time.Second),
+				},
+			},
+			ProxyProtocol: &static.ProxyProtocol{
+				Insecure:   true,
+				TrustedIPs: []string{"127.0.0.1/32", "192.168.0.1"},
+			},
+			ForwardedHeaders: &static.ForwardedHeaders{
+				Insecure:   true,
+				TrustedIPs: []string{"127.0.0.1/32", "192.168.0.1"},
+			},
+			HTTP: static.HTTPConfig{
+				Redirections: &static.Redirections{
+					EntryPoint: &static.RedirectEntryPoint{
+						To:        "foobar",
+						Scheme:    "foobar",
+						Permanent: true,
+						Priority:  42,
+					},
+				},
+				Middlewares: []string{"foobar", "foobar"},
+				TLS: &static.TLSConfig{
+					Options:      "foobar",
+					CertResolver: "foobar",
+					Domains: []types.Domain{
+						{Main: "foobar", SANs: []string{"foobar", "foobar"}},
+					},
+				},
+			},
+		},
+	}
+
+	config.Providers = &static.Providers{
+		ProvidersThrottleDuration: ptypes.Duration(111 * time.Second),
+	}
+
+	config.ServersTransport = &static.ServersTransport{
+		InsecureSkipVerify:  true,
+		RootCAs:             []types.FileOrContent{"RootCAs 1", "RootCAs 2", "RootCAs 3"},
+		MaxIdleConnsPerHost: 111,
+		ForwardingTimeouts: &static.ForwardingTimeouts{
+			DialTimeout:           ptypes.Duration(111 * time.Second),
+			ResponseHeaderTimeout: ptypes.Duration(111 * time.Second),
+			IdleConnTimeout:       ptypes.Duration(111 * time.Second),
+		},
+	}
+
+	config.TCPServersTransport = &static.TCPServersTransport{
+		DialTimeout:   ptypes.Duration(111 * time.Second),
+		DialKeepAlive: ptypes.Duration(111 * time.Second),
+		TLS: &static.TLSClientConfig{
+			InsecureSkipVerify: true,
+			RootCAs:            []types.FileOrContent{"RootCAs 1", "RootCAs 2", "RootCAs 3"},
+		},
+	}
+
+	config.Providers.File = &file.Provider{
+		Directory:                 "file Directory",
+		Watch:                     true,
+		Filename:                  "file Filename",
+		DebugLogGeneratedTemplate: true,
+	}
+
+	config.Providers.Docker = &docker.Provider{
+		Shared: docker.Shared{
+			ExposedByDefault:   true,
+			Constraints:        `Label("foo", "bar")`,
+			AllowEmptyServices: true,
+			Network:            "MyNetwork",
+			UseBindPortIP:      true,
+			Watch:              true,
+			DefaultRule:        "PathPrefix(`/`)",
+		},
+		ClientConfig: docker.ClientConfig{
+			Endpoint: "MyEndPoint", TLS: &types.ClientTLS{
+				CA:                 "myCa",
+				Cert:               "mycert.pem",
+				Key:                "mycert.key",
+				InsecureSkipVerify: true,
+			},
+			HTTPClientTimeout: 42,
+		},
+	}
+
+	config.Providers.Swarm = &docker.SwarmProvider{
+		Shared: docker.Shared{
+			ExposedByDefault:   true,
+			Constraints:        `Label("foo", "bar")`,
+			AllowEmptyServices: true,
+			Network:            "MyNetwork",
+			UseBindPortIP:      true,
+			Watch:              true,
+			DefaultRule:        "PathPrefix(`/`)",
+		},
+		ClientConfig: docker.ClientConfig{
+			Endpoint: "MyEndPoint", TLS: &types.ClientTLS{
+				CA:                 "myCa",
+				Cert:               "mycert.pem",
+				Key:                "mycert.key",
+				InsecureSkipVerify: true,
+			},
+			HTTPClientTimeout: 42,
+		},
+		RefreshSeconds: 42,
+	}
+
+	config.Providers.KubernetesIngress = &ingress.Provider{
+		Endpoint:         "MyEndpoint",
+		Token:            "MyToken",
+		CertAuthFilePath: "MyCertAuthPath",
+		Namespaces:       []string{"a", "b"},
+		LabelSelector:    "myLabelSelector",
+		IngressClass:     "MyIngressClass",
+		IngressEndpoint: &ingress.EndpointIngress{
+			IP:               "IP",
+			Hostname:         "Hostname",
+			PublishedService: "PublishedService",
+		},
+		ThrottleDuration: ptypes.Duration(111 * time.Second),
+	}
+
+	config.Providers.KubernetesCRD = &crd.Provider{
+		Endpoint:         "MyEndpoint",
+		Token:            "MyToken",
+		CertAuthFilePath: "MyCertAuthPath",
+		Namespaces:       []string{"a", "b"},
+		LabelSelector:    "myLabelSelector",
+		IngressClass:     "MyIngressClass",
+		ThrottleDuration: ptypes.Duration(111 * time.Second),
+	}
+
+	config.Providers.KubernetesGateway = &gateway.Provider{
+		Endpoint:         "MyEndpoint",
+		Token:            "MyToken",
+		CertAuthFilePath: "MyCertAuthPath",
+		Namespaces:       []string{"a", "b"},
+		LabelSelector:    "myLabelSelector",
+		ThrottleDuration: ptypes.Duration(111 * time.Second),
+	}
+
+	config.Providers.Rest = &rest.Provider{
+		Insecure: true,
+	}
+
+	config.Providers.ConsulCatalog = &consulcatalog.ProviderBuilder{
+		Configuration: consulcatalog.Configuration{
+			Constraints: `Label("foo", "bar")`,
+			Endpoint: &consulcatalog.EndpointConfig{
+				Address:    "MyAddress",
+				Scheme:     "MyScheme",
+				DataCenter: "MyDatacenter",
+				Token:      "MyToken",
+				TLS: &types.ClientTLS{
+					CA:                 "myCa",
+					Cert:               "mycert.pem",
+					Key:                "mycert.key",
+					InsecureSkipVerify: true,
+				},
+				HTTPAuth: &consulcatalog.EndpointHTTPAuthConfig{
+					Username: "MyUsername",
+					Password: "MyPassword",
+				},
+				EndpointWaitTime: 42,
+			},
+			Prefix:            "MyPrefix",
+			RefreshInterval:   42,
+			RequireConsistent: true,
+			Stale:             true,
+			Cache:             true,
+			ExposedByDefault:  true,
+			DefaultRule:       "PathPrefix(`/`)",
+		},
+		Namespaces: []string{"ns1", "ns2"},
+	}
+
+	config.Providers.Ecs = &ecs.Provider{
+		Constraints:          `Label("foo", "bar")`,
+		ExposedByDefault:     true,
+		RefreshSeconds:       42,
+		DefaultRule:          "PathPrefix(`/`)",
+		Clusters:             []string{"Cluster1", "Cluster2"},
+		AutoDiscoverClusters: true,
+		ECSAnywhere:          true,
+		Region:               "Awsregion",
+		AccessKeyID:          "AwsAccessKeyID",
+		SecretAccessKey:      "AwsSecretAccessKey",
+	}
+
+	config.Providers.Consul = &consul.ProviderBuilder{
+		Provider: kv.Provider{
+			RootKey:   "RootKey",
+			Endpoints: nil,
+		},
+		Token: "secret",
+		TLS: &types.ClientTLS{
+			CA:                 "myCa",
+			Cert:               "mycert.pem",
+			Key:                "mycert.key",
+			InsecureSkipVerify: true,
+		},
+		Namespaces: []string{"ns1", "ns2"},
+	}
+
+	config.Providers.Etcd = &etcd.Provider{
+		Provider: kv.Provider{
+			RootKey:   "RootKey",
+			Endpoints: nil,
+		},
+		Username: "username",
+		Password: "password",
+		TLS: &types.ClientTLS{
+			CA:                 "myCa",
+			Cert:               "mycert.pem",
+			Key:                "mycert.key",
+			InsecureSkipVerify: true,
+		},
+	}
+
+	config.Providers.ZooKeeper = &zk.Provider{
+		Provider: kv.Provider{
+			RootKey:   "RootKey",
+			Endpoints: nil,
+		},
+		Username: "username",
+		Password: "password",
+	}
+
+	config.Providers.Redis = &redis.Provider{
+		Provider: kv.Provider{
+			RootKey:   "RootKey",
+			Endpoints: nil,
+		},
+		Username: "username",
+		Password: "password",
+		TLS: &types.ClientTLS{
+			CA:                 "myCa",
+			Cert:               "mycert.pem",
+			Key:                "mycert.key",
+			InsecureSkipVerify: true,
+		},
+	}
+
+	config.Providers.HTTP = &http.Provider{
+		Endpoint:     "Myendpoint",
+		PollInterval: 42,
+		PollTimeout:  42,
+		TLS: &types.ClientTLS{
+			CA:                 "myCa",
+			Cert:               "mycert.pem",
+			Key:                "mycert.key",
+			InsecureSkipVerify: true,
+		},
+	}
+
+	config.API = &static.API{
+		Insecure:  true,
+		Dashboard: true,
+		Debug:     true,
+	}
+
+	config.Metrics = &otypes.Metrics{
+		Prometheus: &otypes.Prometheus{
+			Buckets:              []float64{0.1, 0.3, 1.2, 5},
+			AddEntryPointsLabels: true,
+			AddServicesLabels:    true,
+			EntryPoint:           "MyEntryPoint",
+			ManualRouting:        true,
+		},
+		Datadog: &otypes.Datadog{
+			Address:              "localhost:8181",
+			PushInterval:         42,
+			AddEntryPointsLabels: true,
+			AddServicesLabels:    true,
+		},
+		StatsD: &otypes.Statsd{
+			Address:              "localhost:8182",
+			PushInterval:         42,
+			AddEntryPointsLabels: true,
+			AddServicesLabels:    true,
+			Prefix:               "MyPrefix",
+		},
+	}
+
+	config.Ping = &ping.Handler{
+		EntryPoint:            "MyEntryPoint",
+		ManualRouting:         true,
+		TerminatingStatusCode: 42,
+	}
+
+	config.Log = &otypes.TraefikLog{
+		Level:      "Level",
+		Format:     "json",
+		FilePath:   "/foo/path",
+		MaxSize:    5,
+		MaxAge:     3,
+		MaxBackups: 4,
+		Compress:   true,
+		OTLP: &otypes.OTelLog{
+			ServiceName: "foobar",
+			ResourceAttributes: map[string]string{
+				"foobar": "foobar",
+			},
+			GRPC: &otypes.OTelGRPC{
+				Endpoint: "foobar",
+				Insecure: true,
+				Headers: map[string]string{
+					"foobar": "foobar",
+				},
+			},
+			HTTP: &otypes.OTelHTTP{
+				Endpoint: "foobar",
+				Headers: map[string]string{
+					"foobar": "foobar",
+				},
+			},
+		},
+	}
+
+	config.AccessLog = &otypes.AccessLog{
+		FilePath: "AccessLog FilePath",
+		Format:   "AccessLog Format",
+		Filters: &otypes.AccessLogFilters{
+			StatusCodes:   []string{"200", "500"},
+			RetryAttempts: true,
+			MinDuration:   42,
+		},
+		Fields: &otypes.AccessLogFields{
+			DefaultMode: "drop",
+			Names: map[string]string{
+				"RequestHost": "keep",
+			},
+			Headers: &otypes.FieldHeaders{
+				DefaultMode: "drop",
+				Names: map[string]string{
+					"Referer": "keep",
+				},
+			},
+		},
+		BufferingSize: 42,
+		OTLP: &otypes.OTelLog{
+			ServiceName: "foobar",
+			ResourceAttributes: map[string]string{
+				"foobar": "foobar",
+			},
+			GRPC: &otypes.OTelGRPC{
+				Endpoint: "foobar",
+				Insecure: true,
+				Headers: map[string]string{
+					"foobar": "foobar",
+				},
+			},
+			HTTP: &otypes.OTelHTTP{
+				Endpoint: "foobar",
+				Headers: map[string]string{
+					"foobar": "foobar",
+				},
+			},
+		},
+	}
+
+	config.Tracing = &static.Tracing{
+		ServiceName: "myServiceName",
+		ResourceAttributes: map[string]string{
+			"foobar": "foobar",
+		},
+		GlobalAttributes: map[string]string{
+			"foobar": "foobar",
+		},
+		SampleRate: 42,
+		OTLP: &otypes.OTelTracing{
+			HTTP: &otypes.OTelHTTP{
+				Endpoint: "foobar",
+				Headers: map[string]string{
+					"foobar": "foobar",
+				},
+			},
+			GRPC: &otypes.OTelGRPC{
+				Endpoint: "foobar",
+				Insecure: true,
+				Headers: map[string]string{
+					"foobar": "foobar",
+				},
+			},
+		},
+	}
+
+	config.HostResolver = &types.HostResolverConfig{
+		CnameFlattening: true,
+		ResolvConfig:    "foobar",
+		ResolvDepth:     42,
+	}
+
+	config.CertificatesResolvers = map[string]static.CertificateResolver{
+		"CertificateResolver0": {
+			ACME: &acme.Configuration{
+				Email:                "acme Email",
+				CAServer:             "CAServer",
+				CertificatesDuration: 42,
+				PreferredChain:       "foobar",
+				Storage:              "Storage",
+				KeyType:              "MyKeyType",
+				DNSChallenge: &acme.DNSChallenge{
+					Provider:                "DNSProvider",
+					DelayBeforeCheck:        42,
+					Resolvers:               []string{"resolver1", "resolver2"},
+					DisablePropagationCheck: true,
+				},
+				HTTPChallenge: &acme.HTTPChallenge{
 					EntryPoint: "MyEntryPoint",
 				},
 				TLSChallenge: &acme.TLSChallenge{},

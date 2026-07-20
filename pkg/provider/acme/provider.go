@@ -119,8 +119,22 @@ type Propagation struct {
 
 // HTTPChallenge contains HTTP challenge configuration.
 type HTTPChallenge struct {
-	EntryPoint string          `description:"HTTP challenge EntryPoint" json:"entryPoint,omitempty" toml:"entryPoint,omitempty" yaml:"entryPoint,omitempty" export:"true"`
-	Delay      ptypes.Duration `description:"Delay between the creation of the challenge and the validation." json:"delay,omitempty" toml:"delay,omitempty" yaml:"delay,omitempty" export:"true"`
+	// Deprecated: please use EntryPoints instead.
+	EntryPoint  string          `description:"(Deprecated) HTTP challenge EntryPoint. Please use EntryPoints instead." json:"entryPoint,omitempty" toml:"entryPoint,omitempty" yaml:"entryPoint,omitempty" export:"true"`
+	EntryPoints []string        `description:"HTTP challenge EntryPoints." json:"entryPoints,omitempty" toml:"entryPoints,omitempty" yaml:"entryPoints,omitempty" export:"true"`
+	Delay       ptypes.Duration `description:"Delay between the creation of the challenge and the validation." json:"delay,omitempty" toml:"delay,omitempty" yaml:"delay,omitempty" export:"true"`
+}
+
+func (h *HTTPChallenge) GetEntryPoints() []string {
+	if len(h.EntryPoints) > 0 {
+		return h.EntryPoints
+	}
+
+	if h.EntryPoint != "" {
+		return []string{h.EntryPoint}
+	}
+
+	return nil
 }
 
 // TLSChallenge contains TLS challenge configuration.
@@ -334,7 +348,7 @@ func (p *Provider) getClient() (*lego.Client, error) {
 	}
 
 	if (p.DNSChallenge == nil || len(p.DNSChallenge.Provider) == 0) &&
-		(p.HTTPChallenge == nil || len(p.HTTPChallenge.EntryPoint) == 0) &&
+		(p.HTTPChallenge == nil || len(p.HTTPChallenge.GetEntryPoints()) == 0) &&
 		p.TLSChallenge == nil {
 		return nil, errors.New("ACME challenge not specified, please select TLS or HTTP or DNS Challenge")
 	}
@@ -371,7 +385,7 @@ func (p *Provider) getClient() (*lego.Client, error) {
 		}
 	}
 
-	if p.HTTPChallenge != nil && len(p.HTTPChallenge.EntryPoint) > 0 {
+	if p.HTTPChallenge != nil && len(p.HTTPChallenge.GetEntryPoints()) > 0 {
 		logger.Debug().Msg("Using HTTP Challenge provider.")
 
 		err = client.Challenge.SetHTTP01Provider(p.HTTPChallengeProvider, http01.SetDelay(time.Duration(p.HTTPChallenge.Delay)))

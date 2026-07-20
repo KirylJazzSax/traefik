@@ -405,7 +405,9 @@
           "disablePropagationCheck": true
         },
         "httpChallenge": {
-          "entryPoint": "MyEntryPoint"
+          "entryPoints": [
+            "MyEntryPoint"
+          ]
         },
         "tlsChallenge": {}
       }
